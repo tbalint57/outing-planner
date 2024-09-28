@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outing Planner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        LOGIN PAGE HEADER 1
+    </header>   
+
+    <div>
+
+        
+        <table class="admin-table" width="90%">
+            <thead>
+                <tr>
+                    <th width="15%">Crew Name</th>
+                    <th width="40%">Crew Captains</th>
+                    <th>Crew Members</th>
+                </tr>
+            </thead>
+            <tbody id="crews">
+                
+            </tbody>
+        </table>
+
+        <div id="adminManager">
+        </div>
+
+    </div>
+
+    <p id="debugInfo"></p>
+    
+    <p id="successfulChange"><a href="time.html">return to main page</a></p>
+
+    <footer>
+        LOGIN PAGE FOOTER
+    </footer>
+
+    <script type="module">
+        import { queryServlet, buildSelect } from "./scripts.js";
+
+        var clubData = null;
+        var userData = null;
+        var deletedMembers = new Set();
+        var deletedCaptains = new Set();
+
+        window.onload = async function (event) {
+            await buildPage();
+        }
+
+
+        async function buildPage() {
+            await getData();
+
+            const crewTable = document.getElementById("crews");
+            crewTable.innerHTML = "";
+
+            clubData.crews.forEach(crew => buildRow(crew));
+
+            buildAdmin();
+        }
+
+
+        async function getData() {
+            if(clubData === null){
+                const data = new URLSearchParams();
+                clubData = await queryServlet(data, 'getClubData');
+            }
+            
+            if(userData === null){
+                const data = new URLSearchParams();
+                userData = await queryServlet(data, 'getUserData');
+            }
+        }
+        
+
+        function buildAdderForm(crewId, isCaptain){
+            const form = document.createElement('form');
+            const submit = document.createElement('input');
+            const select = buildSelect('memberId', 'memberId', clubData.members, 'userId', ['fName', 'lName'], '- please select a member -');
+
+            submit.type = 'submit';
+            submit.value = '+';
+            form.innerHTML += '<input type="hidden" name="crewId" value="'+crewId+'" />';
+
+            form.onsubmit = function (event){
+                isCaptain ? addCrewCaptain(event, this) : addCrewMember(event, this);
+            };
+
+            form.appendChild(submit);
+            form.appendChild(select);
+
+            return form
+        }
+
+
+        function buildAdmin(){
+            const adminForm = document.getElementById('adminManager');
+            adminForm.innerHTML = "<h2>Club Admins</h2>";
+            adminForm.innerHTML += '<b>'+ userData.fName + userData.lName +'</b><br>';
+
+            clubData.admins.forEach(admin => {
+                if(admin.id !== userData.userId){
+                    const func = '"removeAdmin('+admin.id+')"';
+                    adminForm.innerHTML += '<button onclick= '+ func + '>-</button>' + admin.fName + ' ' + admin.lName +'<br>';
+                }
+            });
+
+            const form = document.createElement('form');
+            const submit = document.createElement('input');
+            const select = buildSelect('memberId', 'memberId', clubData.members, 'userId', ['fName', 'lName'], '- please select a member to make them club admin -');
+
+            submit.type = 'submit';
+            submit.value = '+';
+
+            form.onsubmit = function (event){
+                addAdmin(event, this);
+            };
+
+            form.appendChild(submit);
+            form.appendChild(select);
+
+            adminForm.appendChild(form);
+        }
+
+
+        function buildRow(crew){
+            const crewTable = document.getElementById("crews");
+            const captainAdder = buildAdderForm(crew.crew_id, true);
+            const memberAdder = buildAdderForm(crew.crew_id, false);
+            const row = document.createElement('tr');
+            const nameField = document.createElement('td');
+            const captainsField = document.createElement('td');
+            const membersField = document.createElement('td');
+            nameField.innerText = crew.crew_name;
+
+            crew.captains.forEach(captain => {
+                if(!deletedCaptains.has(captain.id + "@" + crew.crew_id)){
+                    const func = '"removeCrewCaptain('+captain.id+', '+crew.crew_id+')"';
+                    captainsField.innerHTML += '<button onclick= '+ func + '>-</button>' + captain.fName + ' ' + captain.lName +'<br>';
+                }
+            });
+            captainsField.appendChild(captainAdder);
+
+            crew.members.forEach(member => {
+                if(!deletedMembers.has(member.id + "@" + crew.crew_id)){
+                    const func = '"removeCrewMember('+member.id+', '+crew.crew_id+')"';
+                    membersField.innerHTML += '<button onclick= '+ func + '>-</button>' + member.fName + ' ' + member.lName +'<br>';
+                }
+            });
+            membersField.appendChild(memberAdder);
+
+            row.appendChild(nameField);
+            row.appendChild(captainsField);
+            row.appendChild(membersField);
+            row.setAttribute("id", "row" + crew.crew_id);
+            crewTable.appendChild(row);
+    }
+
+
+        window.removeCrewCaptain = async function (captain, crewId) {
+            const data = new URLSearchParams();
+            data.append('captainId', captain);
+            data.append('crewId', crewId);
+
+            const result = await queryServlet(data, 'removeCrewCaptain');
+            
+            deletedCaptains.add(captain+"@"+crewId);
+            await buildPage();
+        }
+
+
+        window.removeCrewMember = async function (member, crewId) {
+            const data = new URLSearchParams();
+            data.append('memberId', member);
+            data.append('crewId', crewId);
+
+            const result = await queryServlet(data, 'removeCrewMember');
+
+            deletedMembers.add(member+"@"+crewId);
+            await buildPage();
+        }
+        
+
+        window.removeAdmin = async function (admin) {
+            const data = new URLSearchParams();
+            data.append('adminId', admin);
+
+            const result = await queryServlet(data, 'removeAdmin');
+
+            clubData = null;
+            await buildPage();
+        }
+    
+    
+        window.addAdmin = async function (event, form) {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const data = new URLSearchParams();
+            for (const pair of formData) {
+                console.log(pair[0], pair[1]);
+                data.append(pair[0], pair[1]);
+            }
+
+            const result = queryServlet(data, 'addAdmin');
+            
+            clubData = null;
+            await buildPage();
+        }
+    
+    
+        window.addCrewCaptain = async function (event, form) {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const data = new URLSearchParams();
+            for (const pair of formData) {
+                data.append(pair[0], pair[1]);
+            }
+
+            const result = queryServlet(data, 'addCrewCaptain');
+            
+            clubData = null;
+            deletedMembers = new Set();
+            deletedCaptains = new Set();
+            await buildPage();
+        }
+    
+    
+        window.addCrewMember = async function (event, form) {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const data = new URLSearchParams();
+            for (const pair of formData) {
+                data.append(pair[0], pair[1]);
+            }
+
+            const result = queryServlet(data, 'addCrewMember');
+        
+            clubData = null;
+            deletedMembers = new Set();
+            await buildPage();
+        }
+
+    </script>
+
+</body>
+</html>

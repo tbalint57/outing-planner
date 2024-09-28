@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Outing Planner</title>
+</head>
+<body>
+    <header>
+        AVAILABILITIES HEADER
+    </header>
+
+    <div>
+
+        <div class="left" id="leftDiv">
+            <div class="inner-div">
+                <h1>Outings for This Week</h1>
+
+                <b>[OUTING CALENDAR]</b>
+            </div>
+            
+            <div class="inner-div">
+                <h1>Update your profile details</h1>
+                <a href="profile.html">
+                    <button>Change Profile Details</button>
+                </a>
+            </div>
+
+        </div>
+
+        <div class="right">
+            <h1>Availabilities</h1>
+
+            <p>
+                <div id="When2MeetPart">
+
+                </div>
+                <br>
+                <br>
+                <button onclick="updateAvailabilities()">Update Availabilities</button>
+            </p>
+        </div>
+
+    </div>
+
+    <footer>
+        AVAILABILITIES FOOTER
+    </footer>
+
+    <script type="module">
+        import { queryServlet } from "./scripts.js";
+
+        const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+        const basicColour = '#ffdddd';
+        const highlightedColour = '#009909';
+
+        var userData = null;
+        var userAvailabilities = null;
+        var isMouseDown = false;
+        var startCell = null, currentCell = null, endCell = null;
+
+        document.getElementById('When2MeetPart').addEventListener('mousedown', function(event) {
+            isMouseDown = true;
+            startCell = document.elementFromPoint(event.clientX, event.clientY);
+            // Start tracking the selection
+        });
+
+        document.addEventListener('mousemove', function(event) {
+            if (isMouseDown) {
+                currentCell = document.elementFromPoint(event.clientX, event.clientY);
+                showHighlight();
+            }
+        });
+
+        document.addEventListener('mouseup', function(event) {
+            if (isMouseDown) {
+                isMouseDown = false;
+                endCell = document.elementFromPoint(event.clientX, event.clientY);
+                selectCells();
+            }
+        });
+
+        window.onload = async function (event) {
+            await getData();
+
+            // Admin section
+            if(userData.isAdmin){
+                document.getElementById("leftDiv").innerHTML += '<div class="inner-div" id="admin">'+
+                '<h1>Manage your club</h1>' +
+                '<a href="admin.html">' +
+                '<button>Club Admin</button>' +
+                '</a>' +
+                '</div>';
+            }
+
+            // Crew Captain Section
+            if(userData.captainedCrews.length > 0){
+                document.getElementById("leftDiv").innerHTML += '<div class="inner-div" id="captain">'+
+                '<h1>Manage your Crews</h1>' +
+                '<a href="crew.html">' +
+                '<button>Manage Your Crews</button>' +
+                '</a>' +
+                '</div>';
+            }
+
+            buildWhen2MeetPart();
+        }
+
+
+        window.showHighlight = function (){
+            const toHighlight = !(startCell.highlighted);
+            const rows = document.getElementById('when2meetGrid').children;
+            const xMin = Math.max(0, Math.min(startCell.indX, currentCell.indX)), xMax = Math.max(startCell.indX, currentCell.indX);
+            const yMin = Math.max(0, Math.min(startCell.indY, currentCell.indY)), yMax = Math.max(startCell.indY, currentCell.indY);
+            for(let i = 0; i < rows.length; i++){
+                const row = rows[i];
+                const cells = row.children;
+                for(let j = 0; j < cells.length; j++) {
+                    const cell = cells[j];
+                    if (!cell.isSelectable){
+                        continue;
+                    }
+                    if(cell.highlighted){
+                        cell.style.backgroundColor = highlightedColour;
+                    } else {
+                        cell.style.backgroundColor = basicColour;
+                    }
+                    const inSelect = cell.indX >= xMin && cell.indX <= xMax && cell.indY >= yMin && cell.indY <= yMax;
+                    if (inSelect){
+                        cell.style.backgroundColor = toHighlight ? highlightedColour : basicColour;
+                    }
+                }
+            }
+        }
+
+
+        window.selectCells = function (){
+            const toHighlight = !(startCell.highlighted);
+            const rows = document.getElementById('when2meetGrid').children;
+            const xMin = Math.max(0, Math.min(startCell.indX, currentCell.indX)), xMax = Math.max(startCell.indX, currentCell.indX);
+            const yMin = Math.max(0, Math.min(startCell.indY, currentCell.indY)), yMax = Math.max(startCell.indY, currentCell.indY);
+            for(let i = 0; i < rows.length; i++){
+                const row = rows[i];
+                const cells = row.children;
+                for(let j = 0; j < cells.length; j++) {
+                    const cell = cells[j];
+                    const inSelect = cell.indX >= xMin && cell.indX <= xMax && cell.indY >= yMin && cell.indY <= yMax;
+                    if (inSelect){
+                        cell.highlighted = toHighlight;
+                    }
+
+                    if(cell.isSelectable){
+                        cell.style.backgroundColor = basicColour;
+                    }
+
+                    if(cell.highlighted){
+                        cell.style.backgroundColor = highlightedColour;
+                    }
+                }
+            }
+            startCell = null;
+            currentCell = null;
+            endCell = null;
+        }
+
+
+        window.updateAvailabilities = async function(){
+            var availabilities = [];
+            var buffer = [];
+
+            for(let i = 0; i < 14; i++){
+                buffer.push(null);
+            }
+
+            const rows = document.getElementById('when2meetGrid').children;            
+            for(let i = 0; i < rows.length; i++){
+                const cells = rows[i].children;
+                const date = new Date(new Date().getTime() + i * 24 * 60 * 60 * 1000);
+                for(let j = 0; j < 14; j++){
+                    const cell = document.getElementById('cell' + j + ':' + (i - 2));
+
+                    if(cell == null || !cell.highlighted){
+                        continue;
+                    }
+
+                    const toExtend = buffer[j] != null && buffer[j].endHour == cell.startHour && buffer[j].endMin == cell.startMin;
+                    if (toExtend) {
+                        buffer[j].endHour = cell.endHour;
+                        buffer[j].endMin = cell.endMin;
+                        continue;
+                    }
+                    
+                    if (buffer[j] != null){
+                        availabilities.push(buffer[j]);
+                    }
+
+                    buffer[j] = {
+                        'startHour': cell.startHour,
+                        'startMin': cell.startMin,
+                        'endHour': cell.endHour,
+                        'endMin': cell.endMin,
+                        'year': cell.year,
+                        'month': cell.month,
+                        'day': cell.day,
+                    };
+                }
+            }
+
+            for(let i = 0; i < 14; i++){
+                if (buffer[i] != null){
+                    availabilities.push(buffer[i]);
+                }
+            }
+
+        const data = new URLSearchParams();
+        data.append('availabilities', JSON.stringify(availabilities));
+        const result = await queryServlet(data, 'setMemberAvailabilities');
+    }
+
+
+        function buildWhen2MeetPart() {
+            const when2meet = document.getElementById('When2MeetPart');
+            const grid = buildGrid(14, 56);
+            grid.align = 'center';
+            grid.id = 'when2meetGrid'
+            when2meet.appendChild(grid);
+            populateGrid();
+        }
+
+
+        function buildGrid(n, m) {
+            const grid = document.createElement('table');
+            grid.margin = 0;
+            grid.padding = 0;
+            grid.cellpadding = 0;
+            grid.cellspacing = 0;
+            grid.classList.add('gridTable');
+
+            for(let i = -2; i < m; i++){
+                const row = document.createElement('tr');
+                for(let j = -1; j < n; j++){
+                    createGridCell(row, i, j);
+                }
+
+                row.classList.add('rowDiv');
+                row.padding = 0;
+                row.margin = 0;
+
+                grid.appendChild(row);
+            }
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            row.appendChild(cell);
+            grid.appendChild(row);
+
+            return grid;
+        }
+
+
+        function populateGrid() {
+            const today = new Date(new Date().getTime());
+            userAvailabilities.intervals.forEach(interval => {
+                const date = new Date(interval.year, interval.month - 1, interval.day, today.getHours(), today.getMinutes(), today.getSeconds(), today.getMilliseconds());
+                const column = Math.round((date - today) / (1000 * 60 * 60 * 24));
+                if(column < 0){
+                    return;
+                }
+
+                const startRow = (interval.startHour - 6) * 4 + interval.startMin / 15;
+                const endRow = (interval.endHour - 6) * 4 + interval.endMin / 15;
+                
+                console.log(interval, startRow, endRow);
+
+                for (let i = startRow; i < endRow; i++){
+                    const cell = document.getElementById('cell' + column + ':' + i);
+                    console.log(i, column);
+                    cell.highlighted = true;
+                    cell.style.backgroundColor = highlightedColour;
+                }
+            });
+        }
+
+
+        function displayUserAvailabilities() {
+            const date = new Date(new Date().getTime());
+        }
+
+
+        function createGridCell(row, i, j){
+            const cell = document.createElement('td');
+            cell.id = 'cell' + j + ':' + i;
+            cell.indX = j;
+            cell.indY = i;
+            cell.highlighted = false;
+
+            cell.height = 6;
+            cell.width = 40;
+            cell.padding = 0;
+            cell.margin = 0;
+
+            if (i >= 0 && j>= 0){
+                createSelectableCell(row, cell, i, j);
+            } else {
+                createUnelectableCell(row, cell, i, j);
+            }
+        }
+
+
+        function createSelectableCell(row, cell, i, j){
+            cell.style.borderLeft = '1px solid black';
+            cell.style.borderRight = '1px solid black';
+            cell.style.backgroundColor = basicColour;
+            cell.isSelectable = true;
+
+            const date = new Date(new Date().getTime() + j * 24 * 60 * 60 * 1000);
+            cell.year = date.getFullYear();
+            cell.month = date.getMonth() + 1;
+            cell.day = date.getDate();
+            cell.startHour = Math.floor(6 + i / 4);
+            cell.startMin = (i % 4) * 15;
+            cell.endHour = Math.floor(6 + (i + 1) / 4);
+            cell.endMin = ((i + 1) % 4) * 15;
+
+            if(i%2 == 0){
+                cell.style.borderTop = '1px dotted black';
+            }
+            if(i%4 == 0){
+                cell.style.borderTop = '1px solid black';
+            }
+            if(i%4 == 3){
+                cell.style.borderBottom = '1px solid black';
+            }
+
+            row.appendChild(cell);
+        }
+
+
+        function createUnelectableCell(row, cell, i, j){
+            cell.style.userSelect = "none";
+            cell.style.mozUserSelect = "none";
+            cell.style.khtmlUserSelect = "none";
+            cell.isSelectable = false;
+
+            if(i == -2 && j >= 0){
+                createDateCell(row, cell, i, j);
+            }
+            if(i == -1 && j >= 0){
+                createDayCell(row, cell, i, j);
+            }
+            if(j == -1){
+                createTimeCell(row, cell, i, j);
+            }
+        }
+
+
+        function createDateCell(row, cell, i, j){
+            const date = new Date(new Date().getTime() + j * 24 * 60 * 60 * 1000);
+            cell.innerHTML = date.getDate() + '/' + (date.getMonth() + 1);
+            cell.style.borderRight = '1px solid black';
+            cell.style.borderLeft = '1px solid black';
+            row.appendChild(cell);
+        }
+
+
+        function createDayCell(row, cell, i, j){
+            const date = new Date(new Date().getTime() + j * 24 * 60 * 60 * 1000);
+            cell.innerHTML = days[date.getDay()];
+            cell.style.borderRight = '1px solid black';
+            cell.style.borderLeft = '1px solid black';
+            row.appendChild(cell);         
+        }
+
+
+        function createTimeCell(row, cell, i, j){
+            if((i + 1) % 4 == 0){
+                cell.innerHTML = (6 + (i + 1) / 4) + ':00';
+                cell.rowSpan = 2;
+            }
+            if((i + 1) % 4 == 1){
+                return;
+            }
+
+            row.appendChild(cell);
+        }
+
+
+        async function getData() {
+            if(userData === null){
+                const data = new URLSearchParams();
+                userData = await queryServlet(data, 'getUserData');
+            }
+
+            if(userAvailabilities === null){
+                const data = new URLSearchParams();
+                userAvailabilities = await queryServlet(data, 'getMemberAvailabilities');
+            }
+        }
+
+    </script>
+</body>
+</html>

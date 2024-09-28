@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Outing Planner</title>
+</head>
+<body>
+    <header>
+        CREW HEADER
+    </header>
+
+    <div id="crewSelector" style="text-align: center;"></div>
+
+    <table><tr>
+
+    <td width="35%"><div>
+        
+
+        <table class="admin-table" width="90%">
+            <thead>
+                <tr>
+                    <th style="text-align: right;">Crew Members</th>
+                    <th width="30%">Roles</th>
+                </tr>
+            </thead>
+            <tbody id="crew">
+                
+            </tbody>
+        </table>
+
+    </div></td>
+
+    <td width="65%"><div>
+        <h1>Availabilities</h1>
+
+        <p>
+            <b>[When2Meet Part]</b>
+        </p>
+    </div></td>
+    </tr></table>
+
+    <p id="debugInfo"></p>
+    
+    <p id="successfulChange"><a href="time.html">return to main page</a></p>
+
+    <footer>
+        CREW FOOTER
+    </footer>
+
+    <script type="module">
+        import { queryServlet, buildSelect } from "./scripts.js";
+
+        var crewData = null;
+        var userData = null;
+        var crewId = null;
+
+        window.onload = async function () {
+            await getData();
+            
+            document.getElementById("crewSelector").innerHTML = '<div class="inner-div" id="captained">' +
+                '<h1>Manage your crews</h1>' +
+                '<form name="crewForm" id="crewForm">' +
+                '<select name="crewId" id="crewSelection">' +
+                '<option disabled selected value=>- please select a crew -</option>' +
+                '</select> <br><br>' +
+                '<input type="submit" value="Manage Crew"><br>' +
+                '</form>' +
+                '</div>';
+            
+
+            // Crew Captain Selection
+
+            if(userData.captainedCrews.length > 0){
+                const select=document.getElementById('crewSelection');
+                userData.captainedCrews.forEach(crew => {
+                    const opt = document.createElement('option');
+                    opt.value = crew.id;
+                    opt.innerHTML = crew.name;
+                    select.appendChild(opt);
+                });
+
+                const form = document.getElementById('crewForm');
+                form.onsubmit = async function (event){
+                    event.preventDefault();
+
+                    const formData = new FormData(this);
+                    for (const pair of formData) {
+                        if(pair[0] === 'crewId'){
+                            crewId = pair[1];
+                        }
+                    }
+                    
+                    await buildPage();
+                }
+             }
+        }
+
+        async function buildPage() {
+            const crewTable = document.getElementById("crew");
+            crewTable.innerHTML = "";
+            await getData();
+
+            buildTable(crewTable);
+        }
+        
+
+        function buildTable(crewTable){
+            crewData.members.forEach(member => {
+                const row = document.createElement('tr');
+                const membersField = document.createElement('td');
+                const roleField = document.createElement('td');
+
+                membersField.innerHTML += member.fName + ' ' + member.lName;
+                roleField.innerHTML += getRoles(member);
+
+                const select = buildSelect('roleId', 'roleId', crewData.roleMap, 'id', ['name'], 'role');
+                const submit = document.createElement('input');
+                submit.type = 'submit';
+                submit.value = '+';
+                const addForm = document.createElement('form');
+
+                addForm.appendChild(submit);
+                addForm.appendChild(select);
+                addForm.onsubmit = async function (event) {
+                    addRoleToMember(event, this);
+                }
+                addForm.innerHTML += '<input type="hidden" name="memberId" value="'+member.id+'" />';
+
+                roleField.appendChild(addForm);
+
+                row.appendChild(membersField);
+                row.appendChild(roleField);
+                crewTable.appendChild(row);
+
+/*          crewData.captains.forEach(captain => {
+                if(!deletedCaptains.has(captain.id + "@" + crewData.crew_id)){
+                    const func = '"removeCrewCaptain('+captain.id+', '+crewData.crew_id+')"';
+                    captainsField.innerHTML += '<button onclick= '+ func + '>-</button>' + captain.fName + ' ' + captain.lName +'<br>';
+                }
+            });
+            captainsField.appendChild(captainAdder);*/
+            });
+        }
+
+
+        window.addRoleToMember = async function (event, form){
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const data = new URLSearchParams();
+            data.append('crewId', crewId);
+            for (const pair of formData) {
+                data.append(pair[0], pair[1]);
+            }
+
+            const result = await queryServlet(data, 'addRoleToMember');
+            crewData = null;
+            buildPage();
+        }
+
+
+        window.removeRoleFromMember = async function (role, member){
+            const data = new URLSearchParams();
+            data.append('roleId', role);
+            data.append('crewId', crewId);
+            data.append('memberId', member);
+
+            const result = await queryServlet(data, 'removeRoleFromMember');
+            crewData = null;
+            buildPage();
+        }
+
+    
+        window.addCrewCaptain = async function (event, form) {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const data = new URLSearchParams();
+            for (const pair of formData) {
+                data.append(pair[0], pair[1]);
+            }
+
+            const result = queryServlet(data, 'addCrewCaptain');
+            
+            clubData = null;
+            await buildPage();
+        }
+
+
+        async function getData() {
+            if(userData === null){
+                const data = new URLSearchParams();
+                userData = await queryServlet(data, 'getUserData');
+            }
+
+            if(crewData === null && crewId !== null){
+                const data = new URLSearchParams();
+                data.append('crewId', crewId);
+                crewData = await queryServlet(data, 'getCrewData');
+            }
+        }
+
+
+        function getRoles(member){
+            const roleMap = {};
+            crewData.roleMap.forEach(role => {
+                roleMap[role.id] = role.name;
+            });
+
+            var roleString = '';
+            member.roles.forEach(role => {
+                const func = '"removeRoleFromMember('+role+', '+member.id+')"';
+                roleString += '<button onclick='+func+'>-</button>'+roleMap[role] +'<br>';
+            });
+
+            return roleString
+        }
+    </script>
+</body>
+</html>

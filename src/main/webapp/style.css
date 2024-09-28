@@ -1,0 +1,87 @@
+.admin-table {
+    margin-top: 5%;
+    margin-left: auto;
+    margin-right: auto;
+    width: 80%;
+    border-color: blue;
+    border: 2px;
+}
+
+.admin-table td, .admin-table th {
+    text-align: left;
+    padding: 8px;
+    border: 0px;
+    vertical-align: top;
+    border-left: none;
+    border-right: none;
+}
+
+.admin-table th {
+    background-color: #dddddd;
+    font-weight: bold;
+}
+
+body{
+    background: aliceblue;
+    color:navy;
+    display: flex;
+    flex-direction: column;
+}
+
+footer, header{
+    padding: 3px;
+    color: aliceblue;
+    background: navy;
+    margin: 0;
+    position: fixed;
+    width: 100%;
+
+}
+
+header{
+    position: relative;
+    top: 0;
+    left: 0;
+    margin-bottom: 2pt;
+}
+
+footer {
+    position: relative;
+    left: 0;
+    bottom: 0;
+    margin-top: 2pt;
+}
+
+.login {
+    background: #dddddd;
+    margin-top: 10%;
+    max-width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 5% 10%;
+    text-align: center;
+}
+
+.vertical-align, .left, .right{
+    float: left;
+    margin: 2%;
+    padding: 0.5%;
+    background: #dddddd;
+    text-align: center;
+}
+
+.left{
+    width: 20%;
+}
+
+.right{
+    width: 70%;
+}
+
+.inner-div{
+    background: #bbbbbb;
+}
+
+.gridTable{
+    border-collapse: collapse;
+}

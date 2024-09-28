@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Outing Planner</title>
+</head>
+<body>
+    <header>
+        CLUB SELECTION PAGE HEADER
+    </header>   
+
+    <div class="login">
+
+        <form name="clubForm" id="clubForm">
+        </form>
+        <p id="errorMessage", style="color:red;"></p>
+
+    </div>
+
+    <p id="debugInfo"></p>
+
+    <footer>
+        CLUB SELECTION PAGE FOOTER
+    </footer>
+
+    <script type="module">
+        import {buildSelect} from "./scripts.js";
+        
+        window.onload = async function (event) {
+
+            const data = new URLSearchParams();
+            data.append('service', 'getClubs');
+
+            const response = await fetch('query', {
+                method: 'POST',
+                body: data
+            });
+
+            const result = await response.json();
+            var select = buildSelect('clubSelection', 'clubSelection', result.clubs, 'id', ['name'], '- please select a club -');
+
+            const submit = document.createElement('input');
+            submit.type = 'submit';
+            submit.value = 'Join Club';
+
+            document.getElementById('clubForm').appendChild(select);
+            document.getElementById('clubForm').innerHTML += '<br><br>'
+            document.getElementById('clubForm').appendChild(submit);
+        }
+
+
+        document.getElementById("clubForm").onsubmit = async function (event) {
+            event.preventDefault();
+
+            const formData = new FormData(this);
+
+            const data = new URLSearchParams();
+            for (const pair of formData) {
+                data.append(pair[0], pair[1]);
+            }
+
+            data.append("service", "joinClub");
+            const response = await fetch("query", {
+                method: 'POST',
+                body: data
+            });
+
+            const result = await response.json();
+
+            if (result.redirect !== null){
+                window.location.replace(result.redirect);
+            }
+
+            document.getElementById("errorMessage").innerText = result.errorMessage;
+        }
+    </script>
+
+</body>
+</html>

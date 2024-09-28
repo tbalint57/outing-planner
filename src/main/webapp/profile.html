@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Outing Planner</title>
+</head>
+<body>
+    <header>
+        REGISTRATION PAGE HEADER
+    </header>   
+
+    <div class="login">
+
+        <form id="detailChangeForm" action="register" method="POST" accept-charset="utf-8"> 
+            <label for="newEmail">New Email Address</label><br>
+            <input type="text" id="newEmail" name="newEmail"><br>
+            <label for="newPassword">New Password</label><br>
+            <input type="password" id="newPassword" name="newPassword"><br>
+            <label for="newPasswordConfirm">Confirm New Password</label><br>
+            <input type="password" id="newPasswordConfirm" name="newPasswordConfirm"><br>
+            <label for="newTwoK">New 2k score</label><br>
+            <input type="text" id="newTwoK" name = "newTwoK" placeholder="MM:SS.T" pattern="\d{2}:\d{2}.\d{1}"> <br>
+            <label for="fName">Change First Name</label><br>
+            <input type="text" id="fName" name="fName"><br>
+            <label for="lName">Change Last Name</label><br>
+            <input type="text" id="lName" name="lName"><br>
+            <label for="commitment">Change Commitment</label><br>
+            <input type="number" id="commitment" name="commitment"><br>
+
+            <label for="password">Password</label><br>
+            <input type="password" id="password" name="password"><br><br>
+            
+            <input type="submit" value="Update Details"><br>
+        </form>
+        <p id="errorMessage", style="color:red;"></p>
+        <p id="successfulChange"><a href="time.html">return to main page</a></p>
+
+        </p>
+
+        <br>
+
+    </div>
+
+    <footer>
+        REGISTRATION PAGE FOOTER
+    </footer>
+
+
+    <script type="module">
+        import { queryServlet } from "./scripts.js";
+        
+        window.onload = async function (event) {
+            // get data for user
+            const data = new URLSearchParams();
+            const result = await queryServlet(data, 'getUserData');
+
+            const twoK = result.twoK;
+            const twoKMins = Math.floor(twoK/60) < 10 ? "0" + Math.floor(twoK/60) : Math.floor(twoK/60);
+            const twoKSecs = Math.floor(twoK)%60 < 10 ? "0" + Math.floor(twoK)%60 : Math.floor(twoK)%60;
+            const twoKTenths = Math.round((twoK - Math.floor(twoK)) * 10);
+            const twoKString = twoKMins + ":" + twoKSecs + "." + twoKTenths;
+
+            document.getElementById("newEmail").value = result.email;
+            document.getElementById("fName").value = result.fName;
+            document.getElementById("lName").value = result.lName;
+            document.getElementById("newTwoK").value = twoKString;
+            document.getElementById("commitment").value = result.commitment;
+        }
+
+        document.getElementById("detailChangeForm").onsubmit = async function (event) {
+            event.preventDefault();
+
+            const formData = new FormData(this);
+            const data = new URLSearchParams();
+
+            let newPassword = null;
+            let newPasswordConfirm = null
+            for (const pair of formData) {
+                if(pair[0] === "newTwoK"){
+                    const twoKString = pair[1];
+                    let [mins, secs] = twoKString.split(':');
+                    const twoK = parseFloat(mins) * 60 + parseFloat(secs);
+                    data.append(pair[0], twoK.toString());
+                    continue;
+                }
+
+                data.append(pair[0], pair[1].toString());
+                
+                if(pair[0] === "newPassword"){
+                    newPassword = pair[1];
+                }
+                if(pair[0] === "newPasswordConfirm"){
+                    newPasswordConfirm = pair[1];
+                }
+            }
+
+            if(newPassword !== newPasswordConfirm){
+                document.getElementById("errorMessage").innerText = "New passwords do not match, please try again!";
+                return;
+            }
+
+            const result = await queryServlet(data, 'changeUserData');
+            
+            if(result.success){
+                document.getElementById("successfulChange").innerHTML = 'Your details have been updated successfully!<br><a href="time.html">return to main page</a>';
+                document.getElementById("errorMessage").innerText = '';
+            } else {
+                document.getElementById("successfulChange").innerHTML = '<a href="time.html">return to main page</a>';
+                document.getElementById("errorMessage").innerText = result.errorMessage;
+            }
+        }
+
+    </script>
+
+</body>
+</html>
